@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movie Recommendation + Trailers</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Poppins", sans-serif;
+      transition: 0.4s;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    :root {
+      --bg: #111;
+      --text: white;
+      --card: rgba(255,255,255,0.1);
+    }
+
+    .light {
+      --bg: #ffffff;
+      --text: #111;
+      --card: #f4f4f4;
+    }
+
+    .header {
+      text-align: center;
+      padding: 40px 20px;
+      background: url("https://i.ibb.co/WHtqMMN/movie-banner.jpg") center/cover;
+      color: white;
+      text-shadow: 0 0 10px black;
+    }
+
+    .header h1 { font-size: 45px; }
+    .header p { opacity: 0.9; margin-top: 10px; }
+
+    .toggle-btn {
+      margin: 20px auto;
+      padding: 10px 20px;
+      background: gold;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      display: block;
+      font-size: 16px;
+    }
+
+    .box {
+      width: 500px;
+      margin: 30px auto;
+      background: var(--card);
+      padding: 25px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      margin-bottom: 20px;
+      outline: none;
+      font-size: 16px;
+      background: #222;
+      color: white;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(45deg, #ffce45, #ffb300);
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      color: black;
+      margin-bottom: 20px;
+    }
+
+    .movies-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .movie-card {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+      transition: 0.3s;
+      cursor: pointer;
+    }
+
+    .movie-card:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px gold;
+    }
+
+    .poster {
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+    }
+
+    .movie-title {
+      padding: 10px;
+      font-weight: bold;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    /* TRAILER POPUP */
+    .popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .popup-content {
+      width: 70%;
+      background: black;
+      padding: 20px;
+      border-radius: 10px;
+      position: relative;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 25px;
+      cursor: pointer;
+      color: white;
+    }
+
+    iframe {
+      width: 100%;
+      height: 400px;
+      border: none;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <h1>🎬 Movie Recommender</h1>
+    <p>Discover movies and watch trailers instantly!</p>
+  </div>
+
+  <button class="toggle-btn" onclick="toggleTheme()">Switch Light/Dark Mode</button>
+
+  <div class="box">
+    <input id="movie" placeholder="Enter movie name..." />
+    <button class="btn" onclick="getRecommendations()">Recommend Movies</button>
+
+    <div id="result" class="movies-grid"></div>
+  </div>
+
+  <!-- TRAILER POPUP -->
+  <div class="popup" id="popup">
+    <div class="popup-content">
+      <span class="close-btn" onclick="closePopup()">✖</span>
+      <iframe id="trailerFrame" src=""></iframe>
+    </div>
+  </div>
+
+<script>
+  const API_KEY = "7ea20c570974c21e381df2dc36ada873"; // TMDB API Key
+
+  function toggleTheme() {
+    document.body.classList.toggle("light");
+  }
+
+  function getRecommendations() {
+    let movie = document.getElementById("movie").value;
+
+    fetch("http://127.0.0.1:5000/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movie }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("result").innerHTML = "";
+        data.recommendations.forEach((rec) => loadPoster(rec));
+      })
+      .catch(err => console.error("Backend error:", err));
+  }
+
+  function loadPoster(movieName) {
+    fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${movieName}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        let poster;
+
+        if (data.results && data.results[0] && data.results[0].poster_path) {
+          poster = "https://image.tmdb.org/t/p/w500" + data.results[0].poster_path;
+        } else {
+          poster = "https://i.ibb.co/5FRwRtN/no-poster.png";
+        }
+
+        addCard(movieName, poster);
+      })
+      .catch(() => addCard(movieName, "https://i.ibb.co/5FRwRtN/no-poster.png"));
+  }
+
+  function addCard(movieName, poster) {
+    document.getElementById("result").innerHTML += `
+      <div class="movie-card" onclick="openTrailer('${movieName}')">
+        <img class="poster" src="${poster}" />
+        <div class="movie-title">${movieName}</div>
+      </div>
+    `;
+  }
+
+  function openTrailer(movieName) {
+    fetch(`https://www.youtube.com/results?search_query=${movieName}+trailer`)
+      .then(res => res.text())
+      .then(html => {
+        const match = html.match(/"videoId":"(.*?)"/);
+        if (!match) {
+          alert("Trailer not found!");
+          return;
+        }
+
+        const videoID = match[1];
+        document.getElementById("trailerFrame").src =
+          `https://www.youtube.com/embed/${videoID}`;
+        document.getElementById("popup").style.display = "flex";
+      })
+      .catch(() => alert("Unable to load trailer!"));
+  }
+
+  function closePopup() {
+    document.getElementById("popup").style.display = "none";
+    document.getElementById("trailerFrame").src = "";
+  }
+</script>
+
+
+</body>
+</html>
+
+
+ <!-- run thsi code first
+ python main.py
+ then index.html go to live server -->
